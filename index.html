@@ -263,11 +263,19 @@ Warning: Please use "none" instead.</code></pre>
 \text{SVD}(\Sigma_{XY}) = U \Lambda V^T
 \]</span></p>
 <p>where <span class="math inline">\(\Sigma_{XY}\)</span> is the cross-covariance matrix, <span class="math inline">\(U\)</span> and <span class="math inline">\(V\)</span> are the canonical weights for <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span>, and <span class="math inline">\(\Lambda\)</span> contains the canonical correlations.</p>
-<p>CCA often involves finding multiple pairs of canonical variables. After finding the first pair, we use a deflation process to remove their effect and proceed to find the next pair. This iterative process continues until we extract the desired number of canonical variable pairs.</p>
+<p>We can now find the canonical variables:</p>
 <p><span class="math display">\[
-\Sigma_{XY}^{(2)} = \Sigma_{XY}^{(1)} - \rho_1 u_1 v_1^T
+T_x = XU
+\]</span> <span class="math display">\[
+T_y = YV
 \]</span></p>
-<p>where <span class="math inline">\(\Sigma_{XY}^{(1)}\)</span> is the original cross-covariance matrix, <span class="math inline">\(\rho_1\)</span> is the first canonical correlation, and <span class="math inline">\(u_1\)</span>, <span class="math inline">\(v_1\)</span> are the first pairs of canonical variables from datasets <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span>, respectively. The process is repeated to extract additional pairs of canonical variables.</p>
+<p>After finding the first pair, we use a deflation process to remove their effect and proceed to find the next pair. This iterative process continues until we extract the desired number of canonical variable pairs.</p>
+<p><span class="math display">\[
+X = X-T_x(X^TT_U(T^T_UT_U)^{-1})^T
+\]</span> and for <span class="math inline">\(Y\)</span></p>
+<p><span class="math display">\[
+Y = Y-T_y(Y^TT_U(T^T_UT_U)^{-1})^T
+\]</span> The process is repeated to extract additional pairs of canonical variables.</p>
 <p>Let’s have a look at how we can derive this in R using miRNA and mRNA data</p>
 <div class="cell" data-hash="mixomics_cache/html/unnamed-chunk-14_eaf59ad29db20e408854aa258e8c1a73">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># center both of the datasets</span></span>
@@ -358,7 +366,7 @@ b_{k+1} = \frac{Ab_k}{\|Ab_k\|}
 <ol type="1">
 <li><strong>Calculate Initial Loadings:</strong>
 <ul>
-<li>Compute the initial loadings <span class="math inline">\(u_0\)</span> and <span class="math inline">\(v_0\)</span> for datasets <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span> respectively, obtained from the SVD of the datasets.</li>
+<li>Compute the initial loadings <span class="math inline">\(u_0\)</span> and <span class="math inline">\(v_0\)</span> for datasets <span class="math inline">\(X\)</span> and <span class="math inline">\(Y\)</span> respectively, this can be done randomly!</li>
 <li>Compute the initial scores <span class="math inline">\(s_{X,0} = Xu_0\)</span> and <span class="math inline">\(s_{Y,0} = Yv_0\)</span>.</li>
 </ul></li>
 <li><strong>Iteratively Update Loadings and Scores:</strong>
@@ -378,7 +386,7 @@ s_{X,k+1} = Xu_{k+1}, \quad s_{Y,k+1} = Yv_{k+1}.
 <li>Compute the change in loadings: <span class="math display">\[
 \epsilon_u = \|u_{k+1} - u_k\|, \quad \epsilon_v = \|v_{k+1} - v_k\|.
 \]</span></li>
-<li>If <span class="math inline">\(\epsilon_u &lt; \epsilon\)</span> and <span class="math inline">\(\epsilon_v &lt; \epsilon\)</span>, where <span class="math inline">\(\epsilon\)</span> is a small positive threshold, the algorithm has converged.</li>
+<li>If <span class="math inline">\(max(\epsilon_u,\epsilon_v) &lt; \epsilon\)</span>, where <span class="math inline">\(\epsilon\)</span> is a small positive threshold, the algorithm has converged.</li>
 </ul></li>
 <li><strong>Deflation:</strong>
 <ul>
@@ -389,11 +397,11 @@ Y = Y - s_{Y,k+1} \left( \frac{Y^T s_{Y,k+1}}{s_{Y,k+1}^T s_{Y,k+1}} \right)^T.
 \]</span></li>
 </ul></li>
 </ol>
-<p>The PCA loadings are updated by projecting each dataset onto the scores of the other dataset, capturing the shared information and maximizing the correlation between the datasets. The convergence criterion ensures that the iterative process stops when the loadings become stable, indicating that the canonical variables that maximize the correlation between the datasets have been found. The deflation step is similar to that of SVD.</p>
+<p>The loadings are updated by projecting each dataset onto the scores of the other dataset, capturing the shared information and maximizing the correlation between the datasets. The convergence criterion ensures that the iterative process stops when the loadings become stable, indicating that the canonical variables that maximize the correlation between the datasets have been found. The deflation step is similar to that of SVD.</p>
 </section>
 <section id="implemntation-in-r" class="level4">
 <h4 class="anchored" data-anchor-id="implemntation-in-r">Implemntation in R</h4>
-<div class="cell" data-hash="mixomics_cache/html/unnamed-chunk-16_81f4705f9c824ce52bcb1561158754c8">
+<div class="cell" data-hash="mixomics_cache/html/unnamed-chunk-16_6c3c5cb8d512d26d214fd38f2b21a4ae">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># center the data</span></span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>X_centered <span class="ot">&lt;-</span> <span class="fu">scale</span>(breast.TCGA<span class="sc">$</span>data.train<span class="sc">$</span>mirna, <span class="at">scale =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>Y_centered <span class="ot">&lt;-</span> <span class="fu">scale</span>(breast.TCGA<span class="sc">$</span>data.train<span class="sc">$</span>mrna, <span class="at">scale =</span> <span class="cn">FALSE</span>)</span>
@@ -407,8 +415,8 @@ Y = Y - s_{Y,k+1} \left( \frac{Y^T s_{Y,k+1}}{s_{Y,k+1}^T s_{Y,k+1}} \right)^T.
 <span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>scores_list<span class="ot">&lt;-</span><span class="fu">list</span>()</span>
 <span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(cmp <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>number_of_components)</span>
 <span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>{</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="co"># initialize the loadings based on SVD</span></span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>initial_loadings <span class="ot">&lt;-</span> <span class="fu">lapply</span>(data_merged,<span class="cf">function</span>(x){<span class="fu">svd</span>(x,<span class="dv">1</span>,<span class="dv">1</span>)<span class="sc">$</span>v})</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="co"># initialize the loadings based on random data</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>initial_loadings <span class="ot">&lt;-</span> <span class="fu">lapply</span>(data_merged,<span class="cf">function</span>(x){<span class="fu">runif</span>(<span class="fu">ncol</span>(x))})</span>
 <span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="co"># define an empty loading for new ones</span></span>
 <span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>new_loadings<span class="ot">&lt;-</span>initial_loadings</span>
 <span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>new_loadings[]<span class="ot">&lt;-</span><span class="cn">NA</span></span>
@@ -484,7 +492,7 @@ s_X = X^T (w_Y \cdot s_Y + w_Z \cdot s_Z),
     s_Z = Z^T (w_X \cdot s_X + w_Y \cdot s_Y).
     \]</span></p>
 <p>So given this simple update we can now perform CCA on multiple datasets.</p>
-<p>Let’s try to implement this in R just using weight of 1.</p>
+<p>Let’s try to implement this in R just using weight of 1. To make things faster, instead of random assignment of loadings, we start with SVD.</p>
 <div class="cell" data-hash="mixomics_cache/html/unnamed-chunk-18_41adb07f7b1128b29df476842e40ad4f">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># center the data</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>X_centered <span class="ot">&lt;-</span> <span class="fu">scale</span>(breast.TCGA<span class="sc">$</span>data.train<span class="sc">$</span>mirna, <span class="at">scale =</span> <span class="cn">FALSE</span>)</span>
@@ -563,7 +571,7 @@ s_X = X^T (w_Y \cdot s_Y + w_Z \cdot s_Z),
 </section>
 <section id="gcca-in-r" class="level3">
 <h3 class="anchored" data-anchor-id="gcca-in-r">GCCA in R</h3>
-<p>In reality one does not have to implement the whole algorithm! mixOmics provides us with a very good interface to do GCCA with a lot of flexility. The main function is <code>wrapper.sgcca</code> and we are going to have a look some its main functionality now.</p>
+<p>In reality one does not have to implement the whole algorithm! mixOmics provides us with a very good interface to do GCCA with a lot of flexibility. The main function is <code>wrapper.sgcca</code> and we are going to have a look some its main functionality now.</p>
 <div class="cell" data-hash="mixomics_cache/html/unnamed-chunk-20_87f0e24972f6df8b04f5581430da0150">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># prepare data</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -591,7 +599,7 @@ s_X = X^T (w_Y \cdot s_Y + w_Z \cdot s_Z),
 </div>
 <p>Here instead of having a single loading plot (i choice to show 20 variables for the sake of better plotting), we have three (one for each omics). Here the interpretation is the same as PCA loadings. The higher the absolute value the more influence a particular variable has on the latent scores.</p>
 <p>There are options provided by the function. We are going to focus on the most imporant ones, namely <code>design</code> and <code>keepX</code>.</p>
-<p>I we previously demonstrated, we can weight the scores from different omics before combining them. The <code>design</code> parameter gives us a powerful way of choosing which data view to focus on more and define the relation between the data.</p>
+<p>As we previously demonstrated, we can weight the scores from different omics before combining them. The <code>design</code> parameter gives us a powerful way of choosing which data view to focus on more and define the relation between the data.</p>
 <p>Think of <code>design</code> as a grid where each cell’s value, ranging from 0 to 1, indicates the strength of the relationship between two corresponding data blocks. A value of 0 means no relationship, while 1 signifies a strong connection. When you’re setting up your analysis, adjusting these values can help you emphasize or de-emphasize certain relationships, giving you the flexibility to focus on specific interactions that are of interest.</p>
 <p>For instance, if you’re curious about how two particular blocks of data interact, you’d set their corresponding value in the design matrix closer to 1. This tells sGCCA, “Hey, pay extra attention here!” Conversely, if you believe two other blocks aren’t significantly related, setting their value closer to 0 directs the analysis to not invest much energy in exploring that connection.</p>
 <p>in our previous example, we chose not to provide a design matrix, in this case, mixOmics will construct a design matrix in all datasets have strongest connect (1) to each other.</p>
